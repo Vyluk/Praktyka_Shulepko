@@ -1,0 +1,158 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+public class TspGeneticAlgorithm
+{
+    private static readonly int[,] Distances = new int[,]
+    {
+        { 0, 10, 8, 9, 7 },
+        { 10, 0, 12, 15, 6 },
+        { 8, 12, 0, 10, 11 },
+        { 9, 15, 10, 0, 14 },
+        { 7, 6, 11, 14, 0 }
+    };
+    private const int NumCities = 5;
+    private const int PopulationSize = 50;
+    private const int MaxGenerations = 100;
+    private const double CrossoverRate = 0.8;
+    private const double MutationRate = 0.05;
+    private static readonly Random Random = new Random();
+    public class Route
+    {
+        public List<int> Cities { get; set; } = new List<int>();
+        public double Length { get; set; }
+        public double Fitness { get; set; }
+    }
+    private static void CalculateRouteMetrics(Route route)
+    {
+        double length = 0;
+        for (int i = 0; i < NumCities; i++)
+        {
+            int from = route.Cities[i];
+            int to = route.Cities[(i + 1) % NumCities]; // Циклічний маршрут
+            length += Distances[from, to];
+        }
+        route.Length = length;
+        // Максимізація 1/Length
+        route.Fitness = 1.0 / length;
+    }
+    private static List<Route> InitializePopulation()
+    {
+        var population = new List<Route>();
+        var cities = Enumerable.Range(0, NumCities).ToList();
+        for (int i = 0; i < PopulationSize; i++)
+        {
+            var route = new Route { Cities = new List<int>(cities) };
+            // Випадкове перемішування міст (класичний обмін)
+            for (int j = 0; j < NumCities; j++)
+            {
+                int k = Random.Next(j, NumCities);
+                // Заміна на класичний обмін значень
+                int temp = route.Cities[j];
+                route.Cities[j] = route.Cities[k];
+                route.Cities[k] = temp;
+            }
+            CalculateRouteMetrics(route);
+            population.Add(route);
+        }
+        return population;
+    }
+    private static Route SelectParent(List<Route> population)
+    {
+        double totalFitness = population.Sum(r => r.Fitness);
+        double rouletteWheelPosition = Random.NextDouble() * totalFitness;
+        double currentSum = 0;
+        foreach (var route in population)
+        {
+            currentSum += route.Fitness;
+            if (currentSum >= rouletteWheelPosition)
+            {
+                return route;
+            }
+        }
+        return population.Last();
+    }
+    private static Route OrderCrossover(Route p1, Route p2)
+    {
+        if (Random.NextDouble() < CrossoverRate)
+        {
+            var offspringCities = Enumerable.Repeat(-1, NumCities).ToList();
+            int start = Random.Next(NumCities);
+            int end = Random.Next(NumCities);
+            if (start > end)
+            {
+                int temp = start;
+                start = end;
+                end = temp;
+            }
+            for (int i = start; i <= end; i++)
+            {
+                offspringCities[i] = p1.Cities[i];
+            }
+            int p2Index = 0;
+            for (int i = 0; i < NumCities; i++)
+            {
+                if (offspringCities[i] == -1)
+                {
+                    while (offspringCities.Contains(p2.Cities[p2Index]))
+                    {
+                        p2Index++;
+                    }
+                    offspringCities[i] = p2.Cities[p2Index++];
+                }
+            }
+            return new Route { Cities = offspringCities };
+        }
+        return new Route { Cities = new List<int>(p1.Cities) };
+    }
+    private static void Mutate(Route route)
+    {
+        if (Random.NextDouble() < MutationRate)
+        {
+            int idx1 = Random.Next(NumCities);
+            int idx2 = Random.Next(NumCities);
+            int temp = route.Cities[idx1];
+            route.Cities[idx1] = route.Cities[idx2];
+            route.Cities[idx2] = temp;
+        }
+    }
+    public static void Run()
+    {
+        List<Route> population = InitializePopulation();
+        Route globalBest = population.OrderByDescending(r => r.Fitness).First();
+        Console.WriteLine($"Запуск Генетичного Алгоритму для TSP ({NumCities} міст)\n");
+        for (int generation = 1; generation <= MaxGenerations; generation++)
+        {
+            Route currentBest = population.OrderByDescending(r => r.Fitness).First();
+            if (currentBest.Length < globalBest.Length)
+            {
+                globalBest = currentBest;
+            }
+            Console.WriteLine($"--- Покоління {generation} ---");
+            Console.WriteLine($"Кращий маршрут: {string.Join(" -> ", currentBest.Cities)} -> {currentBest.Cities.First()} | Довжина: {currentBest.Length:F0}");
+            List<Route> newPopulation = new List<Route>();
+            while (newPopulation.Count < PopulationSize)
+            {
+                Route parent1 = SelectParent(population);
+                Route parent2 = SelectParent(population);
+                Route offspring = OrderCrossover(parent1, parent2);
+                Mutate(offspring);
+                CalculateRouteMetrics(offspring);
+                newPopulation.Add(offspring);
+            }
+            population = newPopulation;
+        }
+        Console.WriteLine($" Фінальний найкращий маршрут за {MaxGenerations} поколінь:");
+        Console.WriteLine($"Маршрут: {string.Join(" -> ", globalBest.Cities)} -> {globalBest.Cities.First()}");
+        Console.WriteLine($"Мінімальна довжина: {globalBest.Length:F0}");
+        Console.ReadLine();
+    }
+}
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        TspGeneticAlgorithm.Run();
+    }
+}
