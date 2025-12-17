@@ -1,0 +1,103 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+namespace SimulatedAnnealingTSP
+{
+    class Program
+    {
+        static readonly double[][] distances = new double[][]
+        {
+    new double[] {0, 10, 12, 11, 14, 15, 13, 16, 17, 18 },
+    new double[] {10, 0, 13, 14, 11, 16, 17, 18, 12, 19 },
+    new double[] {12, 13, 0, 15, 16, 17, 18, 11, 19, 10 },
+    new double[] {11, 14, 15, 0, 18, 19, 10, 12, 13, 14 },
+    new double[] {14, 11, 16, 18, 0, 12, 19, 10, 15, 16 },
+    new double[] {15, 16, 17, 19, 12, 0, 14, 13, 18, 11 },
+    new double[] {13, 17, 18, 10, 19, 14, 0, 15, 11, 12 },
+    new double[] {16, 18, 11, 12, 10, 13, 15, 0, 14, 17 },
+    new double[] {17, 12, 19, 13, 15, 18, 11, 14, 0, 13 },
+    new double[] {18, 19, 10, 14, 16, 11, 12, 17, 13, 0 }
+        };
+        static readonly int numCities = distances.Length;
+        static readonly Random random = new Random();
+        static void Main(string[] args)
+        {
+            double initialTemperature = 10000.0; // Початкова "температура"
+            double coolingRate = 0.999;        // Коефіцієнт охолодження
+            double minTemperature = 1.0;       // Мінімальна температура
+
+            int[] currentRoute = GetInitialRoute(numCities);
+            double currentDistance = CalculateDistance(currentRoute, distances);
+            int[] bestRoute = (int[])currentRoute.Clone();
+            double bestDistance = currentDistance;
+            double temperature = initialTemperature;
+            while (temperature > minTemperature)
+            {
+                int[] newRoute = GetNeighborRoute(currentRoute);
+                double newDistance = CalculateDistance(newRoute, distances);
+                double deltaDistance = newDistance - currentDistance;
+                if (deltaDistance < 0 || ShouldAcceptWorse(deltaDistance, temperature))
+                {
+                    currentRoute = newRoute;
+                    currentDistance = newDistance;
+                    if (currentDistance < bestDistance)
+                    {
+                        bestDistance = currentDistance;
+                        bestRoute = (int[])currentRoute.Clone();
+                    }
+                }
+                temperature *= coolingRate;
+            }
+            Console.WriteLine($"Початкова відстань: {CalculateDistance(GetInitialRoute(numCities), distances):F2}");
+            Console.WriteLine($"Кінцева найкраща відстань: {bestDistance:F2}");
+            Console.WriteLine($"Найкращий маршрут: {string.Join(" -> ", bestRoute)} -> {bestRoute[0]}"); // Повернення до старту
+            Console.WriteLine("\nНатисніть будь-яку клавішу для виходу...");
+            Console.ReadKey();
+        }
+        static double CalculateDistance(int[] route, double[][] distances)
+        {
+            double totalDistance = 0.0;
+            int n = route.Length;
+            for (int i = 0; i < n; i++)
+            {
+                int fromCity = route[i];
+                int toCity = route[(i + 1) % n];
+                totalDistance += distances[fromCity][toCity];
+            }
+            return totalDistance;
+        }
+
+        static int[] GetInitialRoute(int numCities)
+        {
+            int[] route = Enumerable.Range(0, numCities).ToArray();
+            for (int i = numCities - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                int temp = route[i];
+                route[i] = route[j];
+                route[j] = temp;
+            }
+            return route;
+        }
+        static int[] GetNeighborRoute(int[] currentRoute)
+        {
+            int[] newRoute = (int[])currentRoute.Clone();
+            int i = random.Next(numCities);
+            int j = random.Next(numCities);
+
+            while (i == j)
+            {
+                j = random.Next(numCities);
+            }
+            int temp = newRoute[i];
+            newRoute[i] = newRoute[j];
+            newRoute[j] = temp;
+            return newRoute;
+        }
+        static bool ShouldAcceptWorse(double deltaDistance, double temperature)
+        {
+            double acceptanceProbability = Math.Exp(-deltaDistance / temperature);
+            return random.NextDouble() < acceptanceProbability;
+        }
+    }
+}
